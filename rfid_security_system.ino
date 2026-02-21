@@ -2,32 +2,34 @@
 #include <MFRC522.h>
 #include <Wire.h>
 #include "RTClib.h"
+#include <Servo.h>
 
 #define SS_PIN 10
 #define RST_PIN 9
 #define LED_PIN 3
+#define SERVO_PIN 5
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 RTC_DS3231 rtc;
+Servo doorServo;
 
-// 🔹 Replace this with your actual card UID
+// Replace with your actual authorized UID
 byte authorizedUID[4] = {0xDE, 0xAD, 0xBE, 0xEF};
 
 void setup() {
   Serial.begin(9600);
   SPI.begin();
-  mfrc522.PCD_Init();
   Wire.begin();
+  mfrc522.PCD_Init();
+  rtc.begin();
 
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
 
-  if (!rtc.begin()) {
-    Serial.println("RTC not found!");
-    while (1);
-  }
+  doorServo.attach(SERVO_PIN);
+  doorServo.write(0); // Locked position
 
-  Serial.println("RFID Security System with Time Logging Ready...");
+  Serial.println("RFID Smart Door Lock System Ready...");
 }
 
 void loop() {
@@ -36,7 +38,6 @@ void loop() {
   if (!mfrc522.PICC_ReadCardSerial()) return;
 
   DateTime now = rtc.now();
-
   bool accessGranted = true;
 
   for (byte i = 0; i < 4; i++) {
@@ -59,7 +60,7 @@ void loop() {
   Serial.print(now.month());
   Serial.print("/");
   Serial.print(now.year());
-  Serial.print("  ");
+  Serial.print(" ");
   Serial.print(now.hour());
   Serial.print(":");
   Serial.print(now.minute());
@@ -68,9 +69,15 @@ void loop() {
 
   if (accessGranted) {
     Serial.println("Access Granted ✅");
+    
     digitalWrite(LED_PIN, HIGH);
-    delay(2000);
+
+    doorServo.write(90);  // Unlock (rotate servo)
+    delay(3000);          // Keep unlocked for 3 seconds
+    doorServo.write(0);   // Lock again
+
     digitalWrite(LED_PIN, LOW);
+
   } else {
     Serial.println("Access Denied ❌");
   }
